@@ -1,0 +1,285 @@
+devtools::install("~/telemR/")
+devtools::load_all("~/telemR/")
+
+library(tidyverse)
+library(lubridate)
+library(cowplot)
+library(telemR)
+
+
+meta.data <- tibble("TMX,1" = c("54_2934", "52_3065"), "TMX,2" = c("48_3061", "50_3063"),
+                    "VEH,1" = c("53_3066", "55_2936"), "VEH,2" = c("49_3062", "51_3064"))
+
+meta.data <- tibble("TMX" = c("54_2934", "52_3065", "48_3061", "50_3063"),
+                    "VEH" = c("53_3066", "55_2936", "49_3062", "51_3064"))
+
+meta.data <- tibble("TMX,1" = c("3N4247", "4N4240"), "TMX,2" = c("18N3675", "19N3677"),
+                    "VEH,1" = c("3N4246", "26N3407"), "VEH,2" = c("19N3676", "2N4245"))
+
+
+meta.data <- tibble("TMX" = c("48t", "50t", "52t", "54t"),
+                    "VEH" = c("49t", "51t", "53t", "55t"))
+
+meta.data <- tibble("TMX,2" = c("48t", "50t"), "TMX,1" = c("52t", "54t"),
+                    "VEH,2" = c("49t", "51t"), "VEH,1" =  c("53t", "55t"))
+
+relco_oddi <- read_oddi("~/Dropbox/JEV/Zhi single cell paper/telemetry/", meta_data = meta.data)
+relco_oddi %>%
+  fuzz_telem(output_window = "1 hours", telem_var = "DegC") %>%
+  graph_telem(group_by = "Group", se_ribbon = T, one_day_avg = T)
+
+
+relco_oddi_c <- relco_oddi %>% fuzz_telem(output_window = "1 hour", telem_var = "DegC") %>% collapse_telem()
+last(relco_oddi_c$Time) %>% as.character()
+relco_oddi_t <- trim_telem(relco_oddi, start_time = "2020-01-12 12:00:00", end_time = "2020-01-20 00:00:00")
+relco_oddi_t %>%
+  fuzz_telem(output_window = "3 hour", telem_var = "DegC") %>%
+  graph_telem(group_by = "Group", se_ribbon = T, tx_time = c("2020-01-14 12:05:00", "2020-01-15 12:05:00"))
+
+relco_oddi_t %>%
+  fuzz_telem(output_window = "6 hour", telem_var = "DegC") %>%
+  graph_telem(group_by = "Group", se_ribbon = T, one_day_avg = T)
+
+
+tmx.telem <- read_starr("~/Box/Tamoxifen Paper/zz157jev.asc", meta_data = meta.data)
+
+relco_tx <- read_starr("~/Dropbox/JEV/telemetry/zz159.asc", meta_data = meta.data, trim_na = T)
+
+tmx.telem %>%
+  graph_telem(group_by = "Group", se_ribbon = T, one_day_avg = T)
+
+relco_tx %>%
+  graph_telem(group_by = "Group", se_ribbon = T, one_day_avg = F)
+
+
+tmx.telem.2 <- read_starr("~/Dropbox/JEV/telemetry/zz161.asc", meta_data = meta.data, trim_na = T)
+
+tmx.telem %>%
+  fuzz_telem("30 min") %>%
+  graph_telem(group_by = "Group", one_day_avg = T, telem_var = "DegC", tx_time = c("2020-01-14 12:05:00", "2020-01-15 12:05:00")) +
+  geom_hline(yintercept = 36) +
+  ylim(35,39)
+
+
+
+tmx.telem.2 %>%
+  fuzz_telem("30 min") %>%
+  graph_telem(group_by = "Group", one_day_avg = T, telem_var = "DegC") + geom_hline(yintercept = 36) + ylim(35,39)
+
+p12 <- plot_grid(p1, p2)
+
+
+save_plot("~/Desktop/tmx_treatment.jpg", plot = p12)
+
+tmx.telem.2 %>%
+  fuzz_telem("30 min") %>%
+  graph_telem(group_by = "Group", one_day_avg = T, telem_var = "DegC")
+
+
+
+export_telem(relco_tx, filename = "~/Desktop/relcov1.xlsx")
+
+graph_telem(relco_tx, group_by = "Group", one_day_avg = F)
+
+relco_tx_fuzz <- fuzz_telem(relco_tx, output_window = "6 hour")
+
+relco_collapsed <- collapse_telem(relco_tx)
+
+graph_telem(relco_collapsed, group_by = "Group", one_day_avg = T)
+
+relco.aov <- lme_telem(relco_collapsed, telem_var = "DegC")
+
+relco.aov$AOV
+multcomp_telem(relco_collapsed, formula = DegC ~ Group)
+
+p2 <- graph_telem(relco_pre, group_by = "Group", one_day_avg = T, telem_var = "Counts")
+
+plot_grid(p1, p2)
+
+graph_telem(relco_tx, group_by = "Group", se_ribbon = T, tx_time = c("0020-02-04 12:05:00", "0020-02-06 12:05:00"))
+relco_pre <- collapse_telem(relco_pre)
+
+graph_telem(relco_oddi, group_by = "Group", one_day_avg = F)
+
+relco_aov <- lme_telem(relco_pre, telem_var = "DegC")
+relco_aov$AOV
+
+multcomp_telem(relco_pre, DegC ~ Group)
+
+relco_binned <- fuzz_telem(relco_pre, output_window = "1 hours")
+relco_binned_collapsed <- collapse_telem(relco_binned)
+graph_telem(relco_binned_collapsed, group_by = "Group")
+
+
+
+relco_pre_trimmed <- trim_telem(relco_pre, start_time = "0020-02-03 00:00:00", end_time = "0020-02-06 00:00:00")
+
+graph_telem(relco_pre_trimmed, group_by = "Group", tx_time = c("0020-02-04 12:05:00"))
+
+p2 <- graph_telem(tmx.telem, group_by = "Group", tx_time = c("0020-01-14 12:05:00", "0020-01-15 12:05:00"))
+graph_telem(tmx_trimmed, group_by = "Mouse", tx_time = c("0020-01-14 12:05:00", "0020-01-15 12:05:00"))
+
+save_plot(filename = "~/Box/correalab/Member Folders/Ed van Veen/Tamoxifen Paper/relco_pre.pdf", plot = p1)
+save_plot(filename = "~/Box/correalab/Member Folders/Ed van Veen/Tamoxifen Paper/tmx_firstpass.pdf", plot = p2, base_height = 5)
+save_plot(filename = "~/Box/correalab/Member Folders/Ed van Veen/Tamoxifen Paper/tmx_firstpass_trimmed.pdf", plot = p3, base_height = 4)
+
+
+relco_pre
+tmx_trimmed
+
+plot_grid(p1,p2)
+
+seq(as.POSIXct(first(grep("00:00:00", x = relco_pre$Time, value = T))), as.POSIXct(last(grep("00:00:00", x = relco_pre$Time, value = T))), by = 43200)
+
+str(as.POSIXct(first(grep("00:00:00", x = relco_pre$Time, value = T))))
+
+graph_telem(tmx.telem, tx_time = c("0020-01-14 10:00:00",
+                                   "0020-01-15 10:00:00",
+                                   "0020-01-13 10:00:00",
+                                   "0020-01-12 10:00:00"), group_by = "Group")
+
+tmx_trimmed <- trim_telem(tmx.telem, start_time = "0020-01-13 00:00:00", end_time = "0020-01-16 00:00:00")
+
+graph_telem(tmx_trimmed, group_by = "Group", tx_time = c("0020-01-14 12:05:00", "0020-01-15 12:05:00"))
+
+export_telem(tmx.telem, filename = "~/Box/correalab/Member Folders/Ed van Veen/Tamoxifen Paper/relcov1.xlsx")
+
+
+d1 <- tmx_trimmed %>%
+  filter(Time > "0020-01-14 13:05:00" & Time < ("0020-01-14 17:05:00")) %>%
+  group_by(Group, Mouse) %>%
+  summarise(avg = mean(DegC))
+
+d2 <- tmx_trimmed %>%
+  filter(Time > "0020-01-15 13:05:00" & Time < ("0020-01-15 17:05:00")) %>%
+  group_by(Group, Mouse) %>%
+  summarise(avg = mean(DegC))
+
+
+as.POSIXct(6)
+
+aov(DegC ~ Group * Time + Error(Mouse), data = tmx.telem)
+summary(demo1.aov)
+
+anova(lm(Counts ~ Group * Time, data = tmx.telem))
+anova(lm(Counts ~ Group * Time, data = tmx_trimmed))
+anova(lm(Counts ~ Group * Time, data = relco_pre))
+anova(lm(Counts ~ Group * Time, data = test))
+
+
+
+lm(Counts ~ Group * Time, data = relco_pre) %>% summary()
+relco_pre$value.lm <- lm(DegC ~ Group + Time, data = relco_pre)$fitted.values
+relco_pre$value.lm <- fullModel$fitted[,3]
+
+
+ggplot(data = relco_pre, aes(x = DegC, y = value.lm)) +
+  geom_point()
+
+ggplot(test, aes(x = Counts)) +
+  geom_histogram(binwidth=10, colour="black", fill="white")
+
+
+
+
+#qqplot. as with histogram, DegC is pretty normal, Counts is NOT. Counts are much more normal when averaged by day
+ggplot(test, aes(sample = DegC)) +
+  geom_qq()
+
+
+Anova(lm(Counts ~ Group * Time, data = tmx.telem), type = 2)
+Anova(lm(Counts ~ Group * Time, data = tmx_trimmed), type = 2)
+Anova(lm(Counts ~ Group * Time, data = relco_pre), type = 2)
+Anova(lm(Counts ~ Group * Time, data = test), type = 2)
+
+#linear mixed effects way. baseline first
+baseline <- lme(Counts ~ 1, random = ~1 | Mouse/Group, data = tmx.telem, method = "ML")
+groupModel <- lme(Counts ~ Group, random = ~1 | Mouse/Group, data = tmx.telem, method = "ML")
+timeModel <- lme(Counts ~ Group + Time, random = ~1 | Mouse/Group, data = tmx.telem, method = "ML")
+fullModel <- lme(Counts ~ Group * Time, random = ~1 | Mouse/Group, data = tmx.telem, method = "ML")
+
+anova(baseline)
+
+
+baseline <- lme(DegC ~ 1, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+groupModel <- lme(DegC ~ Group, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+timeModel <- lme(DegC ~ Group + Time, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+fullModel <- lme(DegC ~ Group * Time, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+
+anova(baseline, groupModel, timeModel, fullModel)
+
+
+
+relco_pre <- transform(relco_pre, Counts = scale(Counts), DegC = scale(DegC))
+graph_telem(relco_pre, group_by = "Group")
+
+baseline <- lme(Counts ~ 1, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+groupModel <- lme(Counts ~ Group, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+timeModel <- lme(Counts ~ Group + Time, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+fullModel <- lme(Counts ~ Group * Time, random = ~1 | Mouse/Group, data = relco_pre, method = "ML")
+
+baseline <- lme(Counts ~ 1, random = ~1 | Mouse/Group, data = test, method = "ML")
+groupModel <- lme(Counts ~ Group, random = ~1 | Mouse/Group, data = test, method = "ML")
+timeModel <- lme(Counts ~ Group + Time, random = ~1 | Mouse/Group, data = test, method = "ML")
+fullModel <- lme(Counts ~ Group * Time, random = ~1 | Mouse/Group, data = test, method = "ML")
+
+#full model is built when you average by day first. when you get lme working, maybe include these plots
+
+test$fitted.baseline <- baseline$fitted[,3]
+test$fitted.group <- groupModel$fitted[,3]
+test$fitted.time <- timeModel$fitted[,3]
+test$fitted.full <- fullModel$fitted[,3]
+
+pb2 <- ggplot(data = test, aes(x = DegC, y = fitted.baseline)) +
+  geom_point()
+pg2 <- ggplot(data = test, aes(x = DegC, y = fitted.group)) +
+  geom_point()
+pt2 <- ggplot(data = test, aes(x = DegC, y = fitted.time)) +
+  geom_point()
+pf2 <- ggplot(data = test, aes(x = DegC, y = fitted.full)) +
+  geom_point()
+
+
+pt <- ggplot(data = test, aes(x = DegC, y = value.lm)) +
+  geom_point()
+
+#this looks pretty friggin good with lme and method "ML"
+
+plot_grid(pb,pg,pt,pf)
+plot_grid(pb2,pg2,pt2,pf2)
+plot_grid(pf, pf2)
+
+anova(baseline, groupModel)
+relco_collapse <- collapse_telem(relco_pre)
+multcomp_telem(relco_pre, formula = DegC ~ Group)
+
+relco_pre$Time %>% round_date("2 hours")
+
+graph_telem(relco_pre, group_by = "Group", one_day_avg = F, se_ribbon = T, telem_var = "DegC")
+
+anova(baseline, groupModel, timeModel, fullModel)
+anova(fullModel)
+
+summary(fullModel)
+
+lme_telem(tmx.telem)
+
+tmx.telem[["DegC"]]
+
+
+
+#linear mixed effects way. baseline first
+baseline <- lme(Counts ~ 1, random = ~1 | Mouse/Group, data = tmx_trimmed, method = "ML")
+
+# Augmented Model
+groupModel <- lme(Counts ~ Group, random = ~1 | Mouse/Group, data = tmx_trimmed, method = "ML")
+
+timeModel <- lme(Counts ~ Group + Time, random = ~1 | Mouse/Group, data = tmx_trimmed, method = "ML")
+
+fullModel <- lme(Counts ~ Group * Time, random = ~1 | Mouse/Group, data = tmx_trimmed, method = "ML")
+
+anova(baseline, groupModel)
+
+multcomp_telem(tmx.telem, DegC ~ Group, plot_or_table = "plot")
+
+

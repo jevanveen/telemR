@@ -1,0 +1,33 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1582527845092.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "B7EBBBC4",
+    "lastKnownWriteTime" : 140222092279808,
+    "last_content_update" : 1582527845092,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "AE0879EE",
+        "caption" : "tcore1",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=tcore1&cache_key=AE0879EE",
+        "displayedObservations" : 25940,
+        "environment" : "",
+        "expression" : "tcore1",
+        "object" : "tcore1",
+        "preview" : 0,
+        "totalObservations" : 25940,
+        "variables" : 4
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

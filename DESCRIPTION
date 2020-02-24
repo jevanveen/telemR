@@ -1,0 +1,18 @@
+Package: telemR
+Type: Package
+Title: Functions for Importing and Analyzing Telemtery Data
+Version: 0.1.0
+Author: J.E. van Veen
+Maintainer: J.E. van Veen <jevanveen@alum.mit.edu>
+Description: These functions allow for -- 1. Importing, cleaning, and organizing telemetry data collected on Starr Life Sciences and Star-Oddi instruments. Currently functions are setup to analyze temperature and movement but additional measurements could easily be added. Data are stored as tibbles in tidy (long) format. 2. Plotting telemetery data, including functions to average over user specified time windows and collapsing data as a 1 day snapshot. 3. Statistical testing of group differences using linear mixed effects models and post-hoc multiple comparisons.
+License: MIT
+Encoding: UTF-8
+LazyData: true
+Imports:
+    broom (>= 0.5.2),
+    dplyr (>= 0.8.3),
+    lubridate (>= 1.7.4),
+    nlme (>= 3.1),
+    readxl (>= 1.3.1),
+    writexl (>= 1.2)
+RoxygenNote: 7.0.2
