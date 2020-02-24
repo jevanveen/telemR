@@ -1,3 +1,44 @@
+#needed fixes/features
+#in trim telem, if no start or end time is listed, it should default to first/last time in tidy telem
+#functions for doing crossover / summary study
+#add sex or other group data
+#legend in collapsed is wrong FIXED
+#DST is off because of bad light schedule FIXED but beware that the schedule will change soon
+#
+#wanted fixes/features
+#should probably change read starr to find first instance of measurement and skip to that in stead of the calculation thing. would be more automatic and fool proof
+
+
+
+
+#' Take two tidy telem files and combine them,
+#'
+#' @param tidy_telem_1 a tidy telemetry tibble, as produced by read_starr or read_oddi
+#' @param tidy_telem_2 a tidy telemetry tibble, as produced by read_starr or read_oddi
+#' @param already_collapsed logical. Are tidy telem files already 1 day averages? if no, they will be collapsed
+#' @return a collpased tidy telemetry tibble
+#' @export
+combine_telem <- function(tidy_telem_1, tidy_telem_2){
+  tryCatch({
+    if(is.POSIXct(tidy_telem_1$Time)){
+      c1 <- collapse_telem(tidy_telem_1)
+    }
+    if(is.POSIXct(tidy_telem_2$Time)){
+      c2 <- collapse_telem(tidy_telem_2)
+    }
+    ret <- bind_rows(c1,c2)
+    if("Counts" %in% colnames(ret)){
+      ret <- ret %>%
+        group_by(Time, Mouse, Group) %>%
+        summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
+    } else {
+      ret <- ret %>%
+        group_by(Time, Mouse, Group) %>%
+        summarise(DegC = mean(DegC, na.rm = T))
+    }
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  return(ret)
+}
 #' Read .asc files produced by starr telemetry and put them in tidy tibbles
 #'
 #' @param raw_asc .asc file produced by starr telemetry system. Use "new format" and "date-time in left column only" when exporting .asc
@@ -106,48 +147,74 @@ export_telem <- function(tidy_telem, filename, return_list = F){
 #' @export
 graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_by = "Mouse", tx_time = NULL, se_ribbon = T){
   tryCatch({
-    if(one_day_avg == F){
-      tidy_telem$DST <- lubridate::dst(tidy_telem$Time)
-      split1 <- filter(tidy_telem, DST == T)
-      split2 <- filter(tidy_telem, DST == F)
-      rect_right1 <- split1$Time
-      lubridate::hour(rect_right1) <- 0
-      lubridate::minute(rect_right1) <- 0
-      rect_right1 <- rect_right1 %>% unique() + lubridate::hours(6)
-      rect_right2 <- split2$Time
-      lubridate::hour(rect_right2) <- 0
-      lubridate::minute(rect_right2) <- 0
-      rect_right2 <- rect_right2 %>% unique() + lubridate::hours(6)
-      rect_right <- c(rect_right1, rect_right2)
-      rect_right <- rect_right[rect_right %within% interval(first_time(tidy_telem$Time), last_time(tidy_telem$Time))]
-      rectangles <- data.frame(
-        xmin = rect_right - lubridate::hours(12),
-        xmax = rect_right,
-        ymin = -Inf,
-        ymax = Inf)
-      time1 <- c(first_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), first_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
-        as.POSIXct() %>%
-        first_time()
-      time2 <- c(last_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), last_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
-        as.POSIXct() %>%
-        last_time()
-      p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
-        theme_classic() +
-        geom_rect(inherit.aes = F, data = rectangles, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
-                  fill='gray80', alpha=0.8) +
-        stat_summary(geom="line", fun.y=mean) +
-        xlab("Time") +
-        ylab(telem_var) +
-        scale_color_discrete(name = group_by) +
-        scale_x_datetime(breaks = seq(time1, time2, by = 43200)) +
-        theme(axis.text.x = element_text(angle = -90))
+    if(is.POSIXct(tidy_telem$Time)){
+      if(one_day_avg == F){
+        tidy_telem$DST <- lubridate::dst(tidy_telem$Time)
+        split1 <- filter(tidy_telem, DST == T)
+        split2 <- filter(tidy_telem, DST == F)
+        rect_right1 <- split1$Time
+        lubridate::hour(rect_right1) <- 0
+        lubridate::minute(rect_right1) <- 0
+        rect_right1 <- rect_right1 %>% unique() + lubridate::hours(6)
+        rect_right2 <- split2$Time
+        lubridate::hour(rect_right2) <- 0
+        lubridate::minute(rect_right2) <- 0
+        rect_right2 <- rect_right2 %>% unique() + lubridate::hours(6)
+        rect_right <- c(rect_right1, rect_right2)
+        rect_right <- rect_right[rect_right %within% interval(first_time(tidy_telem$Time), last_time(tidy_telem$Time))]
+        rectangles <- data.frame(
+          xmin = rect_right - lubridate::hours(12),
+          xmax = rect_right,
+          ymin = -Inf,
+          ymax = Inf)
+        time1 <- c(first_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), first_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
+          as.POSIXct() %>%
+          first_time()
+        time2 <- c(last_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), last_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
+          as.POSIXct() %>%
+          last_time()
+        p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
+          theme_classic() +
+          geom_rect(inherit.aes = F, data = rectangles, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
+                    fill='gray80', alpha=0.8) +
+          stat_summary(geom="line", fun.y=mean) +
+          xlab("Time") +
+          ylab(telem_var) +
+          scale_color_discrete(name = group_by) +
+          scale_x_datetime(breaks = seq(time1, time2, by = 43200)) +
+          theme(axis.text.x = element_text(angle = -90)) +
+          labs(color = "Group")
 
+      } else {
+        tdiff <- last_time(tidy_telem[["Time"]]) - first_time(tidy_telem[["Time"]])
+        tdiff <- tdiff %>%
+          round(2) %>%
+          as.numeric()
+        tidy_telem <- collapse_telem(tidy_telem, telem_var = telem_var)
+        last.break <- tidy_telem$Time %>% last() %>% as.character()
+        p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
+          theme_classic() +
+          geom_rect(aes(xmin = "12:00:00",
+                        xmax = last.break,
+                        ymin = -Inf, ymax = Inf), color = "white", fill = "lightgrey") +
+          stat_summary(geom = "line", fun.y = mean) +
+          xlab("Zeitgeber Time") +
+          ylab(telem_var) +
+          scale_x_discrete(breaks = c("00:00:00", "06:00:00", "12:00:00", "18:00:00", last.break)) +
+          scale_color_discrete(name = group_by) +
+          theme(axis.text.x = element_text(angle = -90)) +
+          ggtitle(paste0(tdiff, " day mean"))  +
+          labs(color = "Group")
+      }
+      if(!is.null(tx_time)){
+        p1 <- p1 +
+          geom_vline(xintercept = as.POSIXct(tx_time), linetype = "dashed")
+      }
+      if(se_ribbon == T){
+        p1 <- p1 +
+          stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = tidy_telem[[group_by]]), alpha = .5, color = NA, show.legend = F)
+      }
     } else {
-      tdiff <- last_time(tidy_telem[["Time"]]) - first_time(tidy_telem[["Time"]])
-      tdiff <- tdiff %>%
-        round(2) %>%
-        as.numeric()
-      tidy_telem <- collapse_telem(tidy_telem, telem_var = telem_var)
       last.break <- tidy_telem$Time %>% last() %>% as.character()
       p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
         theme_classic() +
@@ -157,20 +224,19 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         stat_summary(geom = "line", fun.y = mean) +
         xlab("Zeitgeber Time") +
         ylab(telem_var) +
-        scale_color_discrete(name = group_by) +
         scale_x_discrete(breaks = c("00:00:00", "06:00:00", "12:00:00", "18:00:00", last.break)) +
+        scale_color_discrete(name = group_by) +
         theme(axis.text.x = element_text(angle = -90)) +
-        ggtitle(paste0(tdiff, " day mean"))
+        labs(color = "Group")
+      if(!is.null(tx_time)){
+        p1 <- p1 +
+          geom_vline(xintercept = as.POSIXct(tx_time), linetype = "dashed")
+      }
+      if(se_ribbon == T){
+        p1 <- p1 +
+          stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = tidy_telem[[group_by]]), alpha = .5, color = NA, show.legend = F)
+      }
     }
-    if(!is.null(tx_time)){
-      p1 <- p1 +
-        geom_vline(xintercept = as.POSIXct(tx_time), linetype = "dashed")
-    }
-    if(se_ribbon == T){
-      p1 <- p1 +
-        stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = tidy_telem[[group_by]]), alpha = .5, color = NA, show.legend = F)
-    }
-
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   return(p1)
 }
@@ -376,14 +442,14 @@ collapse_telem <- function(tidy_telem, telem_var = "Both"){
 #' @param lights_on_DST at what time do the lights in the room come on, during DST. This algorithm assumes that the room light schedule does not adjust for DST
 #' @return a tidy telemetry tibble converted to zeitgeber time.
 #' @export
-zeitgeber_time <- function(tidy_telem, undo = F, lights_on_DST = 6){
+zeitgeber_time <- function(tidy_telem, undo = F, lights_on_DST = 8){
   tryCatch({
     if(undo == F){
       tidy_telem$DST <- lubridate::dst(tidy_telem$Time)
       split1 <- filter(tidy_telem, DST == T)
       split2 <- filter(tidy_telem, DST == F)
       split1$Time <- split1$Time %>% - lubridate::hours(lights_on_DST)
-      split2$Time <- split2$Time %>% - lubridate::hours(lights_on_DST + 1)
+      split2$Time <- split2$Time %>% - lubridate::hours(lights_on_DST - 1)
       ret <- bind_rows(split1, split2) %>%
         select(-DST)
     } else {
@@ -391,7 +457,7 @@ zeitgeber_time <- function(tidy_telem, undo = F, lights_on_DST = 6){
       split1 <- filter(tidy_telem, DST == T)
       split2 <- filter(tidy_telem, DST == F)
       split1$Time <- split1$Time %>% + lubridate::hours(lights_on_DST)
-      split2$Time <- split2$Time %>% + lubridate::hours(lights_on_DST + 1)
+      split2$Time <- split2$Time %>% + lubridate::hours(lights_on_DST - 1)
       ret <- bind_rows(split1, split2) %>%
         select(-DST)
     }
@@ -403,7 +469,7 @@ zeitgeber_time <- function(tidy_telem, undo = F, lights_on_DST = 6){
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
 #' @param lights_on_DST at what time do the lights in the room come on, during DST. This algorithm assumes that the room light schedule does not adjust for DST
 #' @return a tidy telemetry tibble with logical column "DST" added. Time is still clock time.
-light_dark <- function(tidy_telem, lights_on_DST = 6){
+light_dark <- function(tidy_telem, lights_on_DST = 8){
   tidy_telem <- tidy_telem %>%
     zeitgeber_time(lights_on_DST = lights_on_DST)
   tidy_telem$Light <- lubridate::am(tidy_telem$Time)
