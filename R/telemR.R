@@ -1,6 +1,6 @@
 #needed fixes/features
-#in trim telem, if no start or end time is listed, it should default to first/last time in tidy telem
-#functions for doing crossover / summary study
+#in trim telem, if no start or end time is listed, it should default to first/last time in tidy telem FIXED
+#functions for doing crossover / summary study.
 #add sex or other group data
 #legend in collapsed is wrong FIXED
 #DST is off because of bad light schedule FIXED but beware that the schedule will change soon
@@ -249,20 +249,26 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
 #' @param keep_mice optionally keep defined mice. Default (NULL) is to keep all.
 #' @return a tidy telemetry tibble
 #' @export
-trim_telem <- function(tidy_telem, start_time, end_time, keep_groups = NULL, keep_mice = NULL){
+trim_telem <- function(tidy_telem, start_time = NULL, end_time = NULL, keep_groups = NULL, keep_mice = NULL){
   tryCatch({
-    pt <- tidy_telem %>%
-      filter(Time >= start_time & Time <= end_time)
+    if(!is.null(start_time)){
+      tidy_telem <- tidy_telem %>%
+        filter(Time >= start_time)
+    }
+    if(!is.null(end_time)){
+      tidy_telem <- tidy_telem %>%
+        filter(Time <= end_time)
+    }
     if(!is.null(keep_groups)){
-      pt <- pt %>%
+      tidy_telem <- tidy_telem %>%
         filter(Group %in% keep_groups)
     }
     if(!is.null(keep_mice)){
-      pt <- pt %>%
+      tidy_telem <- tidy_telem %>%
         filter(Mouse %in% keep_mice)
     }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-  return(pt)
+  return(tidy_telem)
 }
 #' linear mixed effects model of telemetry data.
 #'
@@ -274,7 +280,7 @@ trim_telem <- function(tidy_telem, start_time, end_time, keep_groups = NULL, kee
 lme_telem <- function(tidy_telem, telem_var = "DegC", collapse_first = T){
   tryCatch({
     if(collapse_first == T){
-      tidy_telem <- tidy_telem %>% collapse_telem()
+      tidy_telem <- tidy_telem %>% collapse_telem(telem_var = telem_var)
     }
     basemjev <<- formula(paste0(telem_var," ~ 1"))
     groupmjev <<- formula(paste0(telem_var," ~ Group"))
