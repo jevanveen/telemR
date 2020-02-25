@@ -249,7 +249,7 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
 #' @param keep_mice optionally keep defined mice. Default (NULL) is to keep all.
 #' @return a tidy telemetry tibble
 #' @export
-trim_telem <- function(tidy_telem, start_time = NULL, end_time = NULL, keep_groups = NULL, keep_mice = NULL){
+trim_telem <- function(tidy_telem, start_time = NULL, end_time = NULL, keep_groups = NULL, keep_mice = NULL, cut_mice = NULL){
   tryCatch({
     if(!is.null(start_time)){
       tidy_telem <- tidy_telem %>%
@@ -266,6 +266,10 @@ trim_telem <- function(tidy_telem, start_time = NULL, end_time = NULL, keep_grou
     if(!is.null(keep_mice)){
       tidy_telem <- tidy_telem %>%
         filter(Mouse %in% keep_mice)
+    }
+    if(!is.null(cut_mice)){
+      tidy_telem <- tidy_telem %>%
+        filter(!Mouse %in% cut_mice)
     }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   return(tidy_telem)
