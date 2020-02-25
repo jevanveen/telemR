@@ -299,9 +299,10 @@ lme_telem <- function(tidy_telem, telem_var = "DegC", collapse_first = T){
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
 #' @param formula
 #' @param collapse_first optionally keep defined mice. Default (NULL) is to keep all
+#' @param p_adjust_method method for adjusting p val. one of "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none"
 #' @return list containing anova and models built
 #' @export
-multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse_first = T){
+multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse_first = T, p_adjust_method = "BH"){
   tryCatch({
     if(collapse_first == T){
       tidy_telem <- tidy_telem %>% collapse_telem()
@@ -310,19 +311,20 @@ multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse
       group_by(Time) %>%
       do(broom::tidy(t.test(formula, data = .))) %>%
       ungroup %>%
-      mutate(padj = p.adjust(p.value, method = "fdr"))
+      mutate(padj = p.adjust(p.value, method = p_adjust_method))
     if(plot_or_table == "plot"){
       p1 <- ggplot(data = multcomp, aes(x = Time, y = -log10(padj))) +
         geom_point() +
         theme_classic() +
-        geom_hline(yintercept = 1.30103, linetype = "dashed") +
-        geom_hline(yintercept = 2, linetype = "dashed") +
-        geom_hline(yintercept = 3, linetype = "dashed") +
-        geom_hline(yintercept = 4, linetype = "dashed") +
-        ylim(0,5)
+        geom_hline(aes(yintercept = 1.30103, color = "p = .05"), linetype = "dashed") +
+        geom_hline(aes(yintercept = 2, color = "p = .01"), linetype = "dashed") +
+        geom_hline(aes(yintercept = 3, color = "p = .001"), linetype = "dashed") +
+        geom_hline(aes(yintercept = 4, color = "p = .0001"), linetype = "dashed") +
+        theme(axis.text.x = element_text(angle = -90)) +
+        labs(color = "p values")
 
       if(collapse_first == T){
-        p1 <- p1 + scale_x_discrete(breaks = c("06:00:00", "12:00:00", "18:00:00", "00:00:00", "05:55:00"))
+        p1 <- p1 + scale_x_discrete(breaks = c("06:00:00", "12:00:00", "18:00:00", "00:00:00", "23:55:00"))
       } else {
         first_time <- function(time_vector){range(time_vector)[1]}
         last_time <- function(time_vector){range(time_vector)[2]}
