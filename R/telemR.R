@@ -1,13 +1,10 @@
 #needed fixes/features
-#in trim telem, if no start or end time is listed, it should default to first/last time in tidy telem FIXED
 #functions for doing crossover / summary study.
 #add sex or other group data
-#legend in collapsed is wrong FIXED
-#DST is off because of bad light schedule FIXED but beware that the schedule will change soon
 #
 #wanted fixes/features
 #should probably change read starr to find first instance of measurement and skip to that in stead of the calculation thing. would be more automatic and fool proof
-
+#add column with *s to multcomp
 
 
 
@@ -42,16 +39,22 @@ combine_telem <- function(tidy_telem_1, tidy_telem_2){
 #' Read .asc files produced by starr telemetry and put them in tidy tibbles
 #'
 #' @param raw_asc .asc file produced by starr telemetry system. Use "new format" and "date-time in left column only" when exporting .asc
-#' @param meta_data data frame or tibble containing sample group information
+#' @param meta_data_group data frame or tibble containing sample group information
+#' @param meta_data_xover data frame or tibble containing sample corssover groups
+#' @param meta_data_sex data frame or tibble containing sample sexes
 #' @param n_animals number of animals
 #' @param n_measurements number of measurments taken
 #' @param trim_na logical: should function remove time points containing NA values?
 #' @param trim_bad_probe logical: should function remove bad probes?
 #' @return a tidy telemetry tibble (tidy_telem)
 #' @export
-read_starr <- function(raw_asc, meta_data, n_animals = 8, n_measurements = 2, trim_na = T, trim_bad_probe = F){
+read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_data_sex = NULL, trim_na = T, trim_bad_probe = F){
   tryCatch({
-    temp <- read_tsv(file = raw_asc, skip = (6 + (8 * n_measurements * n_animals)), col_types = "cnnnnnnnnnnnnnnnn")
+    if(is.null(meta_data_xover)){
+
+    }
+    skip <- grep(pattern = "YY/MM/DD", x = read.delim(file = raw_asc, blank.lines.skip = F, header = F)$V1)
+    temp <- read_tsv(file = raw_asc, skip = (skip-1))
     if(trim_na == T){temp <- na.omit(temp)}
     temp[[1]] <- as.POSIXct(temp[[1]])
     colnames(temp)[1] <- "Time"
@@ -62,6 +65,8 @@ read_starr <- function(raw_asc, meta_data, n_animals = 8, n_measurements = 2, tr
         sub(pattern = "Animal ID: ", replacement = "") %>%
         unique()
     )
+    if(is.null(meta_data_sex)){meta_data_sex <- tibble("Unknown" = samples)}
+    if(is.null(meta_data_xover)){meta_data_xover <- tibble("NA" = samples)}
     tlist <- list()
     for(i in samples){
       tlist[[i]] <- dplyr::select(temp, contains(i), contains("Time"))
@@ -70,7 +75,9 @@ read_starr <- function(raw_asc, meta_data, n_animals = 8, n_measurements = 2, tr
       if(grepl("Deg. C", colnames(tlist[[i]][,1]))){colnames(tlist[[i]])[1] <- "DegC"}
       if(grepl("Deg. C", colnames(tlist[[i]][,2]))){colnames(tlist[[i]])[2] <- "DegC"}
       tlist[[i]][,"Mouse"] <- i
-      tlist[[i]][,"Group"] <- colnames(meta_data[grep(i,meta_data)])
+      tlist[[i]][,"Group"] <- colnames(meta_data_group[grep(i,meta_data_group)])
+      tlist[[i]][,"Xover"] <- colnames(meta_data_xover[grep(i,meta_data_xover)])
+      tlist[[i]][,"Sex"] <- colnames(meta_data_sex[grep(i,meta_data_sex)])
     }
     collapse <- bind_rows(tlist)
     collapse$Mouse <- as.factor(collapse$Mouse)
@@ -78,6 +85,7 @@ read_starr <- function(raw_asc, meta_data, n_animals = 8, n_measurements = 2, tr
     collapse$Time <- collapse$Time %>%
       + lubridate::years(2000)
     if(trim_bad_probe == T){collpase <- collpase %>% trim_bad_probe()}
+
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   return(collapse)
 
