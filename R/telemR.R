@@ -1,13 +1,43 @@
 #needed fixes/features
-#functions for doing crossover / summary study.
-#add sex or other group data
-#
+#functions for doing crossover(DONE) / summary study.
+#add sex or other group data(DONE)
+#where you have telem_var specified, look for counts instead
+#in graph, last dark box not drawing
 #wanted fixes/features
-#should probably change read starr to find first instance of measurement and skip to that in stead of the calculation thing. would be more automatic and fool proof
-#add column with *s to multcomp
+#should probably change read starr to find first instance of measurement and skip to that in stead of the calculation thing. would be more automatic and fool proof(DONE)
+#add column with *s to multcomp (DONE)
 
-
-
+#' Combine factors in a tidy telem giving a new column
+#'
+#' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi. MUST HAVE grouping meta data in Xover
+#' @return a one day view of uncrossed telem data
+#' @export
+x_over_telem <- function(tidy_telem, day_1_start, day_2_start, xover_var = "Treated", xover_pattern_1 = "A", xover_pattern_2 = "B"){
+  tryCatch({
+    day1 <<- trim_telem(tidy_telem = tidy_telem, start_time = day_1_start, end_time = (as.POSIXct(day_1_start) + lubridate::days(1))) %>%
+      mutate(Xover = ifelse(grepl(xover_pattern_1, Xover), xover_var, "Control"))
+    day2 <<- trim_telem(tidy_telem = tidy_telem, start_time = day_2_start, end_time = (as.POSIXct(day_2_start) + lubridate::days(1))) %>%
+      mutate(Xover = ifelse(grepl(xover_pattern_2, Xover), xover_var, "Control"))
+    ret <- combine_telem(day1, day2)
+    ret$Xover <- as.factor(ret$Xover)
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  return(ret)
+}
+#' Combine factors in a tidy telem giving a new column
+#'
+#' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
+#' @param telem_var_1 first telem var to combine
+#' @param telem_var_2 second telem var to combine
+#' @return a  tidy telemetry tibble with a new column "x_factor"
+#' @export
+x_factor_telem <- function(tidy_telem, telem_var_1, telem_var_2){
+  tryCatch({
+    ret <- tidy_telem %>%
+      mutate(x_factor = interaction(tidy_telem[[telem_var_1]], tidy_telem[[telem_var_2]]))
+    ret$x_factor <- as.factor(ret$x_factor)
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  return(ret)
+}
 #' Take two tidy telem files and combine them,
 #'
 #' @param tidy_telem_1 a tidy telemetry tibble, as produced by read_starr or read_oddi
@@ -26,14 +56,15 @@ combine_telem <- function(tidy_telem_1, tidy_telem_2){
     ret <- bind_rows(c1,c2)
     if("Counts" %in% colnames(ret)){
       ret <- ret %>%
-        group_by(Time, Mouse, Group) %>%
+        group_by_at(setdiff(names(ret), c("DegC", "Counts"))) %>%
         summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
     } else {
       ret <- ret %>%
-        group_by(Time, Mouse, Group) %>%
+        group_by_at(setdiff(names(ret), c("DegC"))) %>%
         summarise(DegC = mean(DegC, na.rm = T))
     }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  ret <- ungroup(ret)
   return(ret)
 }
 #' Read .asc files produced by starr telemetry and put them in tidy tibbles
@@ -82,6 +113,8 @@ read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_da
     collapse <- bind_rows(tlist)
     collapse$Mouse <- as.factor(collapse$Mouse)
     collapse$Group <- as.factor(collapse$Group)
+    collapse$Xover <- as.factor(collapse$Xover)
+    collapse$Sex <- as.factor(collapse$Sex)
     collapse$Time <- collapse$Time %>%
       + lubridate::years(2000)
     if(trim_bad_probe == T){collpase <- collpase %>% trim_bad_probe()}
@@ -97,7 +130,7 @@ read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_da
 #' @param trim_bad_probe logical: should function remove bad probes? Particularly useful for probes attached to mouse, rather than implanted
 #' @return a tidy telemetry tibble (tidy_telem)
 #' @export
-read_oddi <- function(folder, meta_data, trim_bad_probe = T){
+read_oddi <- function(folder, meta_data_group, meta_data_xover = NULL, meta_data_sex = NULL, trim_bad_probe = T){
   tryCatch({
     files <- list.files(folder)
     temp <- list()
@@ -105,13 +138,18 @@ read_oddi <- function(folder, meta_data, trim_bad_probe = T){
       temp[[i]] <- readxl::read_excel(paste0(folder, i))
       temp[[i]]$Mouse <- i
       colnames(temp[[i]])[2] <- "DegC"
-      temp[[i]]$Group <- colnames(meta_data[grep(sub(i, pattern = ".xlsx", replacement = ""),meta_data)])
+      temp[[i]]$Group <- colnames(meta_data_group[grep(sub(i, pattern = ".xlsx", replacement = ""),meta_data_group)])
+      temp[[i]]$Xover <- colnames(meta_data_xover[grep(sub(i, pattern = ".xlsx", replacement = ""),meta_data_xover)])
+      temp[[i]]$Sex <- colnames(meta_data_sex[grep(sub(i, pattern = ".xlsx", replacement = ""),meta_data_sex)])
     }
     ret <- bind_rows(temp)
     ret$Mouse <- sub(ret$Mouse, pattern = ".xlsx", replacement = "") %>% factor()
+    ret$Group <-ret$Group %>% factor()
+    ret$Xover <-ret$Xover %>% factor()
+    ret$Sex <-ret$Sex %>% factor()
     ret <- mutate(ret, Time = as.POSIXct("1900-01-01 00:00:00") + ((`Date & Time`)*(86400)))
     ret$Time <- lubridate::round_date(ret$Time, unit = "1 minute")
-    ret <- dplyr::select(ret, DegC, Time, Mouse, Group)
+    ret <- select(ret, -c(`Date & Time`))
     if(trim_bad_probe == T){
       ret <- trim_bad_probe(ret)
     }
@@ -167,7 +205,7 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         rect_right2 <- split2$Time
         lubridate::hour(rect_right2) <- 0
         lubridate::minute(rect_right2) <- 0
-        rect_right2 <- rect_right2 %>% unique() + lubridate::hours(6)
+        rect_right2 <- rect_right2 %>% unique() + lubridate::hours(7)
         rect_right <- c(rect_right1, rect_right2)
         rect_right <- rect_right[rect_right %within% interval(first_time(tidy_telem$Time), last_time(tidy_telem$Time))]
         rectangles <- data.frame(
@@ -184,8 +222,8 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
           theme_classic() +
           geom_rect(inherit.aes = F, data = rectangles, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
-                    fill='gray80', alpha=0.8) +
-          stat_summary(geom="line", fun.y=mean) +
+                    fill = 'gray80', alpha = 0.8) +
+          stat_summary(geom = "line", fun.y = mean) +
           xlab("Time") +
           ylab(telem_var) +
           scale_color_discrete(name = group_by) +
@@ -198,7 +236,7 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         tdiff <- tdiff %>%
           round(2) %>%
           as.numeric()
-        tidy_telem <- collapse_telem(tidy_telem, telem_var = telem_var)
+        tidy_telem <- collapse_telem(tidy_telem)
         last.break <- tidy_telem$Time %>% last() %>% as.character()
         p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
           theme_classic() +
@@ -330,6 +368,7 @@ multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse
       do(broom::tidy(t.test(formula, data = .))) %>%
       ungroup %>%
       mutate(padj = p.adjust(p.value, method = p_adjust_method))
+    multcomp$stat_summary <- sapply(X = multcomp$padj, FUN = MCsumm)
     if(plot_or_table == "plot"){
       p1 <- ggplot(data = multcomp, aes(x = Time, y = -log10(padj))) +
         geom_point() +
@@ -363,31 +402,39 @@ multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse
 
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
 }
+
+
+#' return asterisks from p values for easy reading
+#'
+#' @param pval a p value
+#' @return an asterisk code indicating significance
+MCsumm <- function(pval){
+  if(pval >=.05){x <- "NS"}
+  if(pval < .05 & pval >= .01){x <- "*"}
+  if(pval < .01 & pval >= .001){x <- "**"}
+  if(pval < .001 & pval >= .0001){x <- "***"}
+  if(pval < .0001){x <- "****"}
+  return(x)
+}
 #' average telemetry data over user defined windows. very useful when data appear very noisy/oversampled
 #'
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
 #' @param output_window what should final output increment be?
-#' @param telem_var which measurement to fuzz. Default is "Both" which equals "DegC" and "Counts"
 #' @return a time fuzzed tidy telemetry tibble
 #' @export
-fuzz_telem <-function(tidy_telem, output_window, telem_var = "Both"){
+fuzz_telem <-function(tidy_telem, output_window){
   tryCatch({
     tidy_telem$Time <- lubridate::round_date(tidy_telem$Time, unit = output_window)
-    if(telem_var == "Both"){
+    if("Counts" %in% colnames(tidy_telem)){
       tidy_telem <- tidy_telem %>%
-        group_by(Time, Mouse, Group) %>%
+        group_by_at(setdiff(names(tidy_telem), c("DegC", "Counts"))) %>%
         summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
-    }
-    if(telem_var == "DegC"){
+    }else{
       tidy_telem <- tidy_telem %>%
-        group_by(Time, Mouse, Group) %>%
+        group_by_at(setdiff(names(tidy_telem), c("DegC"))) %>%
         summarise(DegC = mean(DegC, na.rm = T))
     }
-    if(telem_var == "Counts"){
-      tidy_telem <- tidy_telem %>%
-        group_by(Time, Mouse, Group) %>%
-        summarise(Counts = mean(Counts, na.rm = T))
-    }
+    tidy_telem <- ungroup(tidy_telem)
     return(tidy_telem)
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
 }
@@ -400,7 +447,7 @@ fuzz_telem <-function(tidy_telem, output_window, telem_var = "Both"){
 #' @export
 trim_bad_probe <- function(tidy_telem, DegC_threshold = 23, over_how_long = "4 hours"){
   tryCatch({
-    fuzzed <- fuzz_telem(tidy_telem, output_window = over_how_long, telem_var = "DegC")
+    fuzzed <- fuzz_telem(tidy_telem, output_window = over_how_long)
     for(i in levels(tidy_telem$Mouse)){
       this.ms.fuzzed <- fuzzed %>%
         filter(Mouse == i)
@@ -424,10 +471,9 @@ trim_bad_probe <- function(tidy_telem, DegC_threshold = 23, over_how_long = "4 h
 #' collapse all days in a tidy telem tibble, averaging read values
 #'
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
-#' @param telem_var which measurements should be collapsed?
 #' @return a tidy telemetry tibble of length 1d. Note time is now of class factor
 #' @export
-collapse_telem <- function(tidy_telem, telem_var = "Both"){
+collapse_telem <- function(tidy_telem){
   tryCatch({
     tidy_telem <- zeitgeber_time(tidy_telem)
     t2 <- as.POSIXct("2020-01-11 23:55:00 PST")
@@ -437,22 +483,17 @@ collapse_telem <- function(tidy_telem, telem_var = "Both"){
     tidy_telem$Time <- tidy_telem$Time %>%
       format("%H:%M:%S") %>%
       factor(levels = levs)
-    if(telem_var == "Both"){
+    if("Counts" %in% colnames(tidy_telem)){
       tidy_telem <- tidy_telem %>%
-        group_by(Time, Mouse, Group) %>%
+        group_by_at(setdiff(names(tidy_telem), c("DegC", "Counts"))) %>%
         summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
-    }
-    if(telem_var == "DegC"){
+    }else{
       tidy_telem <- tidy_telem %>%
-        group_by(Time, Mouse, Group) %>%
+        group_by_at(setdiff(names(tidy_telem), c("DegC"))) %>%
         summarise(DegC = mean(DegC, na.rm = T))
     }
-    if(telem_var == "Counts"){
-      tidy_telem <- tidy_telem %>%
-        group_by(Time, Mouse, Group) %>%
-        summarise(Counts = mean(Counts, na.rm = T))
-    }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  tidy_telem <- ungroup(tidy_telem)
   return(tidy_telem)
 }
 #' convert time to zeitgeber (lightgiver) time: 0 = lights on, 12 = lights off.
