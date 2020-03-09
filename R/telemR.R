@@ -79,7 +79,7 @@ combine_telem <- function(tidy_telem_1, tidy_telem_2){
 #' @param trim_bad_probe logical: should function remove bad probes?
 #' @return a tidy telemetry tibble (tidy_telem)
 #' @export
-read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_data_sex = NULL, trim_na = T, trim_bad_probe = F){
+read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_data_sex = NULL, trim_na = F, trim_bad_probe = F){
   tryCatch({
     skip <- grep(pattern = "YY/MM/DD", x = read.delim(file = raw_asc, blank.lines.skip = F, header = F)$V1)
     temp <- read_tsv(file = raw_asc, skip = (skip-1))
