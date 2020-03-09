@@ -14,9 +14,9 @@
 #' @export
 x_over_telem <- function(tidy_telem, day_1_start, day_2_start, xover_var = "Treated", xover_pattern_1 = "A", xover_pattern_2 = "B"){
   tryCatch({
-    day1 <<- trim_telem(tidy_telem = tidy_telem, start_time = day_1_start, end_time = (as.POSIXct(day_1_start) + lubridate::days(1))) %>%
+    day1 <- trim_telem(tidy_telem = tidy_telem, start_time = day_1_start, end_time = (as.POSIXct(day_1_start) + lubridate::days(1))) %>%
       mutate(Xover = ifelse(grepl(xover_pattern_1, Xover), xover_var, "Control"))
-    day2 <<- trim_telem(tidy_telem = tidy_telem, start_time = day_2_start, end_time = (as.POSIXct(day_2_start) + lubridate::days(1))) %>%
+    day2 <- trim_telem(tidy_telem = tidy_telem, start_time = day_2_start, end_time = (as.POSIXct(day_2_start) + lubridate::days(1))) %>%
       mutate(Xover = ifelse(grepl(xover_pattern_2, Xover), xover_var, "Control"))
     ret <- combine_telem(day1, day2)
     ret$Xover <- as.factor(ret$Xover)
@@ -81,9 +81,6 @@ combine_telem <- function(tidy_telem_1, tidy_telem_2){
 #' @export
 read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_data_sex = NULL, trim_na = T, trim_bad_probe = F){
   tryCatch({
-    if(is.null(meta_data_xover)){
-
-    }
     skip <- grep(pattern = "YY/MM/DD", x = read.delim(file = raw_asc, blank.lines.skip = F, header = F)$V1)
     temp <- read_tsv(file = raw_asc, skip = (skip-1))
     if(trim_na == T){temp <- na.omit(temp)}
@@ -353,10 +350,10 @@ lme_telem <- function(tidy_telem, telem_var = "DegC", collapse_first = T){
 #' multiple comparisons of telemetry data.
 #'
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
-#' @param formula
-#' @param collapse_first optionally keep defined mice. Default (NULL) is to keep all
+#' @param formula a fourmula (unquoted) for comparisons. E.g. DegC ~ Group or Counts ~ Group
+#' @param collapse_first optionally collapse to one day before multiple comparisons
 #' @param p_adjust_method method for adjusting p val. one of "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none"
-#' @return list containing anova and models built
+#' @return plot or table of multiple comparisons
 #' @export
 multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse_first = T, p_adjust_method = "BH"){
   tryCatch({
@@ -380,8 +377,9 @@ multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse
         theme(axis.text.x = element_text(angle = -90)) +
         labs(color = "p values")
 
-      if(collapse_first == T){
-        p1 <- p1 + scale_x_discrete(breaks = c("06:00:00", "12:00:00", "18:00:00", "00:00:00", "23:55:00"))
+      if(!is.POSIXct(tidy_telem$Time)){
+        p1 <- p1 + scale_x_discrete(breaks = c("06:00:00", "12:00:00", "18:00:00", "00:00:00", "23:55:00")) +
+          xlab("Zeitgeber Time")
       } else {
         first_time <- function(time_vector){range(time_vector)[1]}
         last_time <- function(time_vector){range(time_vector)[2]}
@@ -402,8 +400,6 @@ multcomp_telem <- function(tidy_telem, formula, plot_or_table = "plot", collapse
 
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
 }
-
-
 #' return asterisks from p values for easy reading
 #'
 #' @param pval a p value
@@ -475,6 +471,7 @@ trim_bad_probe <- function(tidy_telem, DegC_threshold = 23, over_how_long = "4 h
 #' @export
 collapse_telem <- function(tidy_telem){
   tryCatch({
+    if(is.POSIXct(tidy_telem$Time)){
     tidy_telem <- zeitgeber_time(tidy_telem)
     t2 <- as.POSIXct("2020-01-11 23:55:00 PST")
     t3 <- as.POSIXct("2020-01-11 00:00:00 PST")
@@ -492,8 +489,9 @@ collapse_telem <- function(tidy_telem){
         group_by_at(setdiff(names(tidy_telem), c("DegC"))) %>%
         summarise(DegC = mean(DegC, na.rm = T))
     }
+    tidy_telem <- ungroup(tidy_telem)
+    }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-  tidy_telem <- ungroup(tidy_telem)
   return(tidy_telem)
 }
 #' convert time to zeitgeber (lightgiver) time: 0 = lights on, 12 = lights off.
