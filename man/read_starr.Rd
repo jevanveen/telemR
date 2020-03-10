@@ -6,25 +6,29 @@
 \usage{
 read_starr(
   raw_asc,
-  meta_data,
-  n_animals = 8,
-  n_measurements = 2,
-  trim_na = T,
+  meta_data_group,
+  meta_data_xover = NULL,
+  meta_data_sex = NULL,
+  trim_na = F,
   trim_bad_probe = F
 )
 }
 \arguments{
 \item{raw_asc}{.asc file produced by starr telemetry system. Use "new format" and "date-time in left column only" when exporting .asc}
 
-\item{meta_data}{data frame or tibble containing sample group information}
+\item{meta_data_group}{data frame or tibble containing sample group information}
 
-\item{n_animals}{number of animals}
+\item{meta_data_xover}{data frame or tibble containing sample corssover groups}
 
-\item{n_measurements}{number of measurments taken}
+\item{meta_data_sex}{data frame or tibble containing sample sexes}
 
 \item{trim_na}{logical: should function remove time points containing NA values?}
 
 \item{trim_bad_probe}{logical: should function remove bad probes?}
+
+\item{n_animals}{number of animals}
+
+\item{n_measurements}{number of measurments taken}
 }
 \value{
 a tidy telemetry tibble (tidy_telem)

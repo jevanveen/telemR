@@ -4,14 +4,20 @@
 \alias{read_oddi}
 \title{Read a folder of xlsx files produced by star-oddi telemetry and put them together in a tidy tibble}
 \usage{
-read_oddi(folder, meta_data, trim_bad_probe = T)
+read_oddi(
+  folder,
+  meta_data_group,
+  meta_data_xover = NULL,
+  meta_data_sex = NULL,
+  trim_bad_probe = T
+)
 }
 \arguments{
 \item{folder}{a folder containing xlsx files produced by star-oddi emitters}
 
-\item{meta_data}{data frame or tibble containing sample group information}
-
 \item{trim_bad_probe}{logical: should function remove bad probes? Particularly useful for probes attached to mouse, rather than implanted}
+
+\item{meta_data}{data frame or tibble containing sample group information}
 }
 \value{
 a tidy telemetry tibble (tidy_telem)

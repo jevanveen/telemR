@@ -4,14 +4,12 @@
 \alias{fuzz_telem}
 \title{average telemetry data over user defined windows. very useful when data appear very noisy/oversampled}
 \usage{
-fuzz_telem(tidy_telem, output_window, telem_var = "Both")
+fuzz_telem(tidy_telem, output_window)
 }
 \arguments{
 \item{tidy_telem}{a tidy telemetry tibble, as produced by read_starr or read_oddi}
 
 \item{output_window}{what should final output increment be?}
-
-\item{telem_var}{which measurement to fuzz. Default is "Both" which equals "DegC" and "Counts"}
 }
 \value{
 a time fuzzed tidy telemetry tibble

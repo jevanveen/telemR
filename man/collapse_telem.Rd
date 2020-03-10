@@ -4,12 +4,10 @@
 \alias{collapse_telem}
 \title{collapse all days in a tidy telem tibble, averaging read values}
 \usage{
-collapse_telem(tidy_telem, telem_var = "Both")
+collapse_telem(tidy_telem)
 }
 \arguments{
 \item{tidy_telem}{a tidy telemetry tibble, as produced by read_starr or read_oddi}
-
-\item{telem_var}{which measurements should be collapsed?}
 }
 \value{
 a tidy telemetry tibble of length 1d. Note time is now of class factor

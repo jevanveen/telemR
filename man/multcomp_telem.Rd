@@ -4,15 +4,25 @@
 \alias{multcomp_telem}
 \title{multiple comparisons of telemetry data.}
 \usage{
-multcomp_telem(tidy_telem, formula, plot_or_table = "plot", collapse_first = T)
+multcomp_telem(
+  tidy_telem,
+  formula,
+  plot_or_table = "plot",
+  collapse_first = T,
+  p_adjust_method = "BH"
+)
 }
 \arguments{
 \item{tidy_telem}{a tidy telemetry tibble, as produced by read_starr or read_oddi}
 
-\item{collapse_first}{optionally keep defined mice. Default (NULL) is to keep all}
+\item{formula}{a fourmula (unquoted) for comparisons. E.g. DegC ~ Group or Counts ~ Group}
+
+\item{collapse_first}{optionally collapse to one day before multiple comparisons}
+
+\item{p_adjust_method}{method for adjusting p val. one of "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none"}
 }
 \value{
-list containing anova and models built
+plot or table of multiple comparisons
 }
 \description{
 multiple comparisons of telemetry data.

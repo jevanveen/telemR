@@ -4,7 +4,7 @@
 \alias{light_dark}
 \title{add a logical column to tidy telem tibble indicating if lights are on (true)}
 \usage{
-light_dark(tidy_telem, lights_on_DST = 6)
+light_dark(tidy_telem, lights_on_DST = 8)
 }
 \arguments{
 \item{tidy_telem}{a tidy telemetry tibble, as produced by read_starr or read_oddi}

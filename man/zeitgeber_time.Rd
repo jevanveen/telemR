@@ -4,7 +4,7 @@
 \alias{zeitgeber_time}
 \title{convert time to zeitgeber (lightgiver) time: 0 = lights on, 12 = lights off.}
 \usage{
-zeitgeber_time(tidy_telem, undo = F, lights_on_DST = 7)
+zeitgeber_time(tidy_telem, undo = F, lights_on_DST = 8)
 }
 \arguments{
 \item{tidy_telem}{a tidy telemetry tibble, as produced by read_starr or read_oddi}

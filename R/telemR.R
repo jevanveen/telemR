@@ -1,11 +1,8 @@
 #needed fixes/features
-#functions for doing crossover(DONE) / summary study.
-#add sex or other group data(DONE)
+#summary study.
 #where you have telem_var specified, look for counts instead
 #in graph, last dark box not drawing
 #wanted fixes/features
-#should probably change read starr to find first instance of measurement and skip to that in stead of the calculation thing. would be more automatic and fool proof(DONE)
-#add column with *s to multcomp (DONE)
 
 #' Combine factors in a tidy telem giving a new column
 #'
@@ -130,6 +127,9 @@ read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_da
 read_oddi <- function(folder, meta_data_group, meta_data_xover = NULL, meta_data_sex = NULL, trim_bad_probe = T){
   tryCatch({
     files <- list.files(folder)
+    samples <- sub(files, pattern = ".xlsx", replacement = "")
+    if(is.null(meta_data_sex)){meta_data_sex <- tibble("Unknown" = samples)}
+    if(is.null(meta_data_xover)){meta_data_xover <- tibble("NA" = samples)}
     temp <- list()
     for(i in files){
       temp[[i]] <- readxl::read_excel(paste0(folder, i))
@@ -167,11 +167,11 @@ export_telem <- function(tidy_telem, filename, return_list = F){
     for(i in levels(tidy_telem$Group)){
       tlist[[paste0("Deg.C, ", i)]] <- tidy_telem %>%
         filter(Group == i) %>%
-        select(-Counts) %>%
+        select(-Counts, -Xover, -Sex, -Group) %>%
         pivot_wider(names_from = Mouse, values_from = DegC)
       tlist[[paste0("Counts, ", i)]] <- tidy_telem %>%
         filter(Group == i) %>%
-        select(-DegC) %>%
+        select(-DegC, -Xover, -Sex, -Group) %>%
         pivot_wider(names_from = Mouse, values_from = Counts)
     }
     writexl::write_xlsx(tlist, path = filename)
@@ -327,7 +327,7 @@ trim_telem <- function(tidy_telem, start_time = NULL, end_time = NULL, keep_grou
 lme_telem <- function(tidy_telem, telem_var = "DegC", collapse_first = T){
   tryCatch({
     if(collapse_first == T){
-      tidy_telem <- tidy_telem %>% collapse_telem(telem_var = telem_var)
+      tidy_telem <- tidy_telem %>% collapse_telem()
     }
     basemjev <<- formula(paste0(telem_var," ~ 1"))
     groupmjev <<- formula(paste0(telem_var," ~ Group"))

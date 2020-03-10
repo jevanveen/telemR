@@ -6,10 +6,11 @@
 \usage{
 trim_telem(
   tidy_telem,
-  start_time,
-  end_time,
+  start_time = NULL,
+  end_time = NULL,
   keep_groups = NULL,
-  keep_mice = NULL
+  keep_mice = NULL,
+  cut_mice = NULL
 )
 }
 \arguments{
