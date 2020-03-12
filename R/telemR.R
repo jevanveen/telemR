@@ -1,6 +1,5 @@
 #needed fixes/features
 #summary study.
-#where you have telem_var specified, look for counts instead
 #in graph, last dark box not drawing
 #wanted fixes/features
 
@@ -35,11 +34,48 @@ x_factor_telem <- function(tidy_telem, telem_var_1, telem_var_2){
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   return(ret)
 }
+#' Take two tidy telem files and align(combine) them, without collpasing.
+#' Note that new dates for tidy_telem_2 will be inaccurate.
+#' If animals in the two experiments have the same number and meta data,
+#' their values will be averaged by default
+#'
+#' @param tidy_telem_1 a tidy telemetry tibble, as produced by read_starr or read_oddi
+#' @param tidy_telem_2 a tidy telemetry tibble, as produced by read_starr or read_oddi
+#' @param align_date_1 date in tidy_telem_1 to align with date in tidy_telem_2
+#' @param align_date_2 date in tidy_telem_2 to align with date in tidy_telem_1
+#' @return a collpased tidy telemetry tibble
+#' @export
+align_telem <- function(tidy_telem_1, tidy_telem_2, align_date_1 = NULL, align_date_2 = NULL){
+  tryCatch({
+    if(is.null(align_date_1)){
+      align_date_1 <- first_time(tidy_telem_1$Time) %>% lubridate::date()
+    }
+    if(is.null(align_date_2)){
+      align_date_2 <- first_time(tidy_telem_2$Time) %>% lubridate::date()
+    }
+      t1 <- as.POSIXct(paste0(align_date_1, " ", "23:55:55"))
+      t2 <- as.POSIXct(paste0(align_date_2, " ", "23:55:55"))
+      tdiff <- t2 - t1
+      tidy_telem_2$Time <- tidy_telem_2$Time - tdiff
+      ret <- bind_rows(tidy_telem_1, tidy_telem_2)
+      if("Counts" %in% colnames(ret)){
+        ret <- ret %>%
+          group_by_at(setdiff(names(ret), c("DegC", "Counts"))) %>%
+          summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
+      } else {
+        ret <- ret %>%
+          group_by_at(setdiff(names(ret), c("DegC"))) %>%
+          summarise(DegC = mean(DegC, na.rm = T))
+      }
+
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  ret <- ungroup(ret)
+  return(ret)
+}
 #' Take two tidy telem files and combine them,
 #'
 #' @param tidy_telem_1 a tidy telemetry tibble, as produced by read_starr or read_oddi
 #' @param tidy_telem_2 a tidy telemetry tibble, as produced by read_starr or read_oddi
-#' @param already_collapsed logical. Are tidy telem files already 1 day averages? if no, they will be collapsed
 #' @return a collpased tidy telemetry tibble
 #' @export
 combine_telem <- function(tidy_telem_1, tidy_telem_2){
@@ -472,24 +508,24 @@ trim_bad_probe <- function(tidy_telem, DegC_threshold = 23, over_how_long = "4 h
 collapse_telem <- function(tidy_telem){
   tryCatch({
     if(is.POSIXct(tidy_telem$Time)){
-    tidy_telem <- zeitgeber_time(tidy_telem)
-    t2 <- as.POSIXct("2020-01-11 23:55:00 PST")
-    t3 <- as.POSIXct("2020-01-11 00:00:00 PST")
-    levs <- c(seq(t3, t2, by=300)) %>%
-      format("%H:%M:%S")
-    tidy_telem$Time <- tidy_telem$Time %>%
-      format("%H:%M:%S") %>%
-      factor(levels = levs)
-    if("Counts" %in% colnames(tidy_telem)){
-      tidy_telem <- tidy_telem %>%
-        group_by_at(setdiff(names(tidy_telem), c("DegC", "Counts"))) %>%
-        summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
-    }else{
-      tidy_telem <- tidy_telem %>%
-        group_by_at(setdiff(names(tidy_telem), c("DegC"))) %>%
-        summarise(DegC = mean(DegC, na.rm = T))
-    }
-    tidy_telem <- ungroup(tidy_telem)
+      tidy_telem <- zeitgeber_time(tidy_telem)
+      t2 <- as.POSIXct("2020-01-11 23:55:00 PST")
+      t3 <- as.POSIXct("2020-01-11 00:00:00 PST")
+      levs <- c(seq(t3, t2, by=300)) %>%
+        format("%H:%M:%S")
+      tidy_telem$Time <- tidy_telem$Time %>%
+        format("%H:%M:%S") %>%
+        factor(levels = levs)
+      if("Counts" %in% colnames(tidy_telem)){
+        tidy_telem <- tidy_telem %>%
+          group_by_at(setdiff(names(tidy_telem), c("DegC", "Counts"))) %>%
+          summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
+      }else{
+        tidy_telem <- tidy_telem %>%
+          group_by_at(setdiff(names(tidy_telem), c("DegC"))) %>%
+          summarise(DegC = mean(DegC, na.rm = T))
+      }
+      tidy_telem <- ungroup(tidy_telem)
     }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   return(tidy_telem)
