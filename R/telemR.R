@@ -203,11 +203,11 @@ export_telem <- function(tidy_telem, filename, return_list = F){
     for(i in levels(tidy_telem$Group)){
       tlist[[paste0("Deg.C, ", i)]] <- tidy_telem %>%
         filter(Group == i) %>%
-        select(-Counts, -Xover, -Sex, -Group) %>%
+        select(Time, Mouse, DegC) %>%
         pivot_wider(names_from = Mouse, values_from = DegC)
       tlist[[paste0("Counts, ", i)]] <- tidy_telem %>%
         filter(Group == i) %>%
-        select(-DegC, -Xover, -Sex, -Group) %>%
+        select(Time, Mouse, Counts) %>%
         pivot_wider(names_from = Mouse, values_from = Counts)
     }
     writexl::write_xlsx(tlist, path = filename)
@@ -252,11 +252,11 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         time2 <- c(last_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), last_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
           as.POSIXct() %>%
           last_time()
-        p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
+        p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[group_by]], group = .data[[group_by]])) +
           theme_classic() +
           geom_rect(inherit.aes = F, data = rectangles, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
                     fill = 'gray80', alpha = 0.8) +
-          stat_summary(geom = "line", fun.y = mean) +
+          stat_summary(geom = "line", fun = mean) +
           xlab("Time") +
           ylab(telem_var) +
           scale_color_discrete(name = group_by) +
@@ -271,12 +271,12 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
           as.numeric()
         tidy_telem <- collapse_telem(tidy_telem)
         last.break <- tidy_telem$Time %>% last() %>% as.character()
-        p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
+        p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[group_by]], group = .data[[group_by]])) +
           theme_classic() +
           geom_rect(aes(xmin = "12:00:00",
                         xmax = last.break,
                         ymin = -Inf, ymax = Inf), color = "white", fill = "lightgrey") +
-          stat_summary(geom = "line", fun.y = mean) +
+          stat_summary(geom = "line", fun = mean) +
           xlab("Zeitgeber Time") +
           ylab(telem_var) +
           scale_x_discrete(breaks = c("00:00:00", "06:00:00", "12:00:00", "18:00:00", last.break)) +
@@ -291,16 +291,16 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
       }
       if(se_ribbon == T){
         p1 <- p1 +
-          stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = tidy_telem[[group_by]]), alpha = .5, color = NA, show.legend = F)
+          stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = .data[[group_by]]), alpha = .5, color = NA, show.legend = F)
       }
     } else {
       last.break <- tidy_telem$Time %>% last() %>% as.character()
-      p1 <- ggplot(data = tidy_telem, aes(x = tidy_telem[["Time"]], y = tidy_telem[[telem_var]], color = tidy_telem[[group_by]], group = tidy_telem[[group_by]])) +
+      p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[group_by]], group = .data[[group_by]])) +
         theme_classic() +
         geom_rect(aes(xmin = "12:00:00",
                       xmax = last.break,
                       ymin = -Inf, ymax = Inf), color = "white", fill = "lightgrey") +
-        stat_summary(geom = "line", fun.y = mean) +
+        stat_summary(geom = "line", fun = mean) +
         xlab("Zeitgeber Time") +
         ylab(telem_var) +
         scale_x_discrete(breaks = c("00:00:00", "06:00:00", "12:00:00", "18:00:00", last.break)) +
@@ -309,11 +309,11 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         labs(color = "Group")
       if(!is.null(tx_time)){
         p1 <- p1 +
-          geom_vline(xintercept = as.POSIXct(tx_time), linetype = "dashed")
+          geom_vline(xintercept = tx_time, linetype = "dashed")
       }
       if(se_ribbon == T){
         p1 <- p1 +
-          stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = tidy_telem[[group_by]]), alpha = .5, color = NA, show.legend = F)
+          stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = .data[[group_by]]), alpha = .5, color = NA, show.legend = F)
       }
     }
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
