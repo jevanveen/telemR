@@ -452,16 +452,23 @@ MCsumm <- function(pval){
 #'
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
 #' @param output_window what should final output increment be?
+#' @param sum_counts logical. should counts be summed rather than averaged?
 #' @return a time fuzzed tidy telemetry tibble
 #' @export
-fuzz_telem <-function(tidy_telem, output_window){
+fuzz_telem <-function(tidy_telem, output_window, sum_counts = F){
   tryCatch({
     tidy_telem$Time <- lubridate::round_date(tidy_telem$Time, unit = output_window)
-    if("Counts" %in% colnames(tidy_telem)){
+    if(("Counts" %in% colnames(tidy_telem)) & sum_counts == F){
       tidy_telem <- tidy_telem %>%
         group_by_at(setdiff(names(tidy_telem), c("DegC", "Counts"))) %>%
         summarise(Counts = mean(Counts, na.rm = T), DegC = mean(DegC, na.rm = T))
-    }else{
+    }
+    if(("Counts" %in% colnames(tidy_telem)) & sum_counts == T){
+      tidy_telem <- tidy_telem %>%
+        group_by_at(setdiff(names(tidy_telem), c("DegC", "Counts"))) %>%
+        summarise(Counts = sum(Counts), DegC = mean(DegC, na.rm = T))
+    }
+    if(!("Counts" %in% colnames(tidy_telem))){
       tidy_telem <- tidy_telem %>%
         group_by_at(setdiff(names(tidy_telem), c("DegC"))) %>%
         summarise(DegC = mean(DegC, na.rm = T))
