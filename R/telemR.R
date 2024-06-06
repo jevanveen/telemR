@@ -3,6 +3,66 @@
 #in graph, last dark box not drawing
 #wanted fixes/features
 
+
+
+#' produce a tidy telem file with given parameters. mice are given random four-letter codes
+#'
+#' @param n_mice how many mice to output
+#' @param n_days how many days to output
+#' @param minute_increment what time intervals to generate
+#' @param intra_mouse_variability how much random variability to add between mice
+#' @param inter_mouse_variability how much random variability to add from one timepoint to the next for each mouse
+#' @param base_temp what is the default temperature of the mouse
+#' @param define_group group name given to all mice output in tidy telem
+#' @param night_shift difference between day and night average temperature
+#' @return a tidy telem
+#' @export
+random_tidy_telem <- function(n_mice = 3, n_days = 3, minute_increment = 5,
+                              intra_mouse_variability = .5, inter_mouse_variability = .5, base_temp = 37,
+                              define_group = NULL, night_shift = 1){
+  temp <- list()
+  for(j in 1:n_mice){
+
+
+    ret <- tibble(Time = seq.POSIXt(ymd_hms("2016-03-19 00:00:00"), ymd_hms("2016-03-19 00:00:00") + seconds(ddays(n_days)), by = 60*minute_increment),
+                  Mouse = do.call(paste0, replicate(4, sample(LETTERS, 1, TRUE), FALSE)),
+                  Group = define_group,
+                  DegC = base_temp)
+    ret <- ret %>% mutate(bt = ifelse(hour(Time) >=7 & hour(Time) <19,
+                                      (base_temp - .5*(night_shift) + rnorm(1, sd = inter_mouse_variability)),
+                                      (base_temp + .5*(night_shift) + rnorm(1, sd = inter_mouse_variability))))
+    ret$DegC[1] <- ret$bt[1]
+    for(i in 2:length(seq.POSIXt(ymd_hms("2016-03-19 00:00:00"), ymd_hms("2016-03-19 00:00:00") + seconds(ddays(n_days)), by = 60*minute_increment))){
+      ret$DegC[i] = ((7*ret$DegC[i-1] + ret$bt[i])/8) + rnorm(1, sd = intra_mouse_variability)
+    }
+    temp[[j]] <- ret
+  }
+  return(bind_rows(temp))
+}
+
+
+#' read individual cubisens csv files
+#'
+#' @param cubi_csv a csv produced by cubisens data loggers
+#' @param round_time round data to nearest x time
+#' @param file_write optional filename and path for export of processed xlsx file
+#' @return a tidy telem
+#' @export
+read_cubisens <- function(cubi_csv, round_time = "5 minutes", file_write = NULL){
+  temp <- read_csv(cubi_csv) %>%
+    select(Timestamp, `Converted Temp Data`)
+  colnames(temp) <- c("Time", "DegC")
+  temp$Mouse <- cubi_csv %>%
+    fs::path_file() %>%
+    fs::path_ext_remove()
+  temp$Time <- temp$Time %>% lubridate::round_date(unit = round_time)
+  if(cubi_csv == file_write){print("Did not write. Input and output file names cannot be the same.")} else{
+    if(!is.null(file_write)){
+      writexl::write_xlsx(temp, path = file_write)
+    }}
+  return(temp)
+}
+
 #' Combine factors in a tidy telem giving a new column
 #'
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi. MUST HAVE grouping meta data in Xover
@@ -136,9 +196,9 @@ read_starr <- function(raw_asc, meta_data_group, meta_data_xover = NULL, meta_da
       if(grepl("Deg. C", colnames(tlist[[i]][,1]))){colnames(tlist[[i]])[1] <- "DegC"}
       if(grepl("Deg. C", colnames(tlist[[i]][,2]))){colnames(tlist[[i]])[2] <- "DegC"}
       tlist[[i]][,"Mouse"] <- i
-      tlist[[i]][,"Group"] <- colnames(meta_data_group[grep(i,meta_data_group)])
-      tlist[[i]][,"Xover"] <- colnames(meta_data_xover[grep(i,meta_data_xover)])
-      tlist[[i]][,"Sex"] <- colnames(meta_data_sex[grep(i,meta_data_sex)])
+      tlist[[i]][,"Group"] <- names(meta_data_group[grep(i,meta_data_group)])
+      tlist[[i]][,"Xover"] <- names(meta_data_xover[grep(i,meta_data_xover)])
+      tlist[[i]][,"Sex"] <- names(meta_data_sex[grep(i,meta_data_sex)])
     }
     collapse <- bind_rows(tlist)
     collapse$Mouse <- as.factor(collapse$Mouse)
@@ -198,17 +258,26 @@ read_oddi <- function(folder, meta_data_group, meta_data_xover = NULL, meta_data
 #' @export
 export_telem <- function(tidy_telem, filename, return_list = F){
   tryCatch({
-    tidy_telem$Time <- as.character(tidy_telem$Time)
+    tidy_telem$Time <- strftime(tidy_telem$Time)
     tlist <- list()
-    for(i in levels(tidy_telem$Group)){
-      tlist[[paste0("Deg.C, ", i)]] <- tidy_telem %>%
-        filter(Group == i) %>%
-        select(Time, Mouse, DegC) %>%
-        pivot_wider(names_from = Mouse, values_from = DegC)
-      tlist[[paste0("Counts, ", i)]] <- tidy_telem %>%
-        filter(Group == i) %>%
-        select(Time, Mouse, Counts) %>%
-        pivot_wider(names_from = Mouse, values_from = Counts)
+    if("Counts" %in% colnames(tidy_telem)){
+      for(i in levels(tidy_telem$Group)){
+       tlist[[paste0("Deg.C, ", i)]] <- tidy_telem %>%
+         filter(Group == i) %>%
+         select(Time, Mouse, DegC) %>%
+          pivot_wider(names_from = Mouse, values_from = DegC)
+        tlist[[paste0("Counts, ", i)]] <- tidy_telem %>%
+         filter(Group == i) %>%
+         select(Time, Mouse, Counts) %>%
+         pivot_wider(names_from = Mouse, values_from = Counts)
+      }} else {
+        for(i in levels(tidy_telem$Group)){
+          tlist[[paste0("Deg.C, ", i)]] <- tidy_telem %>%
+            filter(Group == i) %>%
+            select(Time, Mouse, DegC) %>%
+            pivot_wider(names_from = Mouse, values_from = DegC)
+      }
+
     }
     writexl::write_xlsx(tlist, path = filename)
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
@@ -224,7 +293,7 @@ export_telem <- function(tidy_telem, filename, return_list = F){
 #' @param se_ribbon logical: display standard error ribbon?
 #' @return plot
 #' @export
-graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_by = "Mouse", tx_time = NULL, se_ribbon = T){
+graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_by = "Mouse", color_by = group_by, tx_time = NULL, se_ribbon = T){
   tryCatch({
     if(is.POSIXct(tidy_telem$Time)){
       if(one_day_avg == F){
@@ -246,13 +315,13 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
           xmax = rect_right,
           ymin = -Inf,
           ymax = Inf)
-        time1 <- c(first_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), first_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
+        time1 <- c(first_time(grep("12:00:00", x = strftime(tidy_telem[["Time"]]), value = T)), first_time(grep("00:00:00", x = strftime(tidy_telem[["Time"]]), value = T))) %>%
           as.POSIXct() %>%
           first_time()
-        time2 <- c(last_time(grep("12:00:00", x = tidy_telem[["Time"]], value = T)), last_time(grep("00:00:00", x = tidy_telem[["Time"]], value = T))) %>%
+        time2 <- c(last_time(grep("12:00:00", x = strftime(tidy_telem[["Time"]]), value = T)), last_time(grep("00:00:00", x = strftime(tidy_telem[["Time"]]), value = T))) %>%
           as.POSIXct() %>%
           last_time()
-        p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[group_by]], group = .data[[group_by]])) +
+        p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[color_by]], group = .data[[group_by]])) +
           theme_classic() +
           geom_rect(inherit.aes = F, data = rectangles, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
                     fill = 'gray80', alpha = 0.8) +
@@ -263,14 +332,17 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
           scale_x_datetime(breaks = seq(time1, time2, by = 43200)) +
           theme(axis.text.x = element_text(angle = -90)) +
           labs(color = "Group")
-
+        if(!is.null(tx_time)){
+          p1 <- p1 +
+            geom_vline(xintercept = as.POSIXct(tx_time, tz = "UTC"), color = "red", linetype = "dashed")
+        }
       } else {
         tdiff <- last_time(tidy_telem[["Time"]]) - first_time(tidy_telem[["Time"]])
         tdiff <- tdiff %>%
           round(2) %>%
           as.numeric()
         tidy_telem <- collapse_telem(tidy_telem)
-        last.break <- tidy_telem$Time %>% last() %>% as.character()
+        last.break <- tidy_telem$Time %>% last() %>% strftime()
         p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[group_by]], group = .data[[group_by]])) +
           theme_classic() +
           geom_rect(aes(xmin = "12:00:00",
@@ -282,19 +354,16 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
           scale_x_discrete(breaks = c("00:00:00", "06:00:00", "12:00:00", "18:00:00", last.break)) +
           scale_color_discrete(name = group_by) +
           theme(axis.text.x = element_text(angle = -90)) +
-          ggtitle(paste0(tdiff, " day mean"))  +
+          ggtitle(paste0(tdiff, " day mean"))+
           labs(color = "Group")
       }
-      if(!is.null(tx_time)){
-        p1 <- p1 +
-          geom_vline(xintercept = as.POSIXct(tx_time), linetype = "dashed")
-      }
+
       if(se_ribbon == T){
         p1 <- p1 +
           stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = .data[[group_by]]), alpha = .5, color = NA, show.legend = F)
       }
     } else {
-      last.break <- tidy_telem$Time %>% last() %>% as.character()
+      last.break <- tidy_telem$Time %>% last() %>% strftime()
       p1 <- ggplot(data = tidy_telem, aes(x = .data[["Time"]], y = .data[[telem_var]], color = .data[[group_by]], group = .data[[group_by]])) +
         theme_classic() +
         geom_rect(aes(xmin = "12:00:00",
@@ -307,10 +376,6 @@ graph_telem <- function(tidy_telem, telem_var = "DegC", one_day_avg = F, group_b
         scale_color_discrete(name = group_by) +
         theme(axis.text.x = element_text(angle = -90)) +
         labs(color = "Group")
-      if(!is.null(tx_time)){
-        p1 <- p1 +
-          geom_vline(xintercept = tx_time, linetype = "dashed")
-      }
       if(se_ribbon == T){
         p1 <- p1 +
           stat_summary(geom="ribbon", fun.data = mean_se, aes(fill = .data[[group_by]]), alpha = .5, color = NA, show.legend = F)
@@ -537,6 +602,7 @@ collapse_telem <- function(tidy_telem){
   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   return(tidy_telem)
 }
+
 #' convert time to zeitgeber (lightgiver) time: 0 = lights on, 12 = lights off.
 #'
 #' @param tidy_telem a tidy telemetry tibble, as produced by read_starr or read_oddi
